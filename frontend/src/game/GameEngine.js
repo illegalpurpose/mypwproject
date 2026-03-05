@@ -70,7 +70,7 @@ class Bot {
     this.pauseTimer = randomInRange(40, 100);
     this.hooked = false;
     this.alive = true;
-    this.lastAngle = Math.PI;
+    this.lastAngle = 0;
     // Bot hook state
     this.hook = {
       x: 0, y: 0,
@@ -110,7 +110,7 @@ class Bot {
       if (d > 2) {
         this.x += (dx / d) * BOT_SPEED;
         this.y += (dy / d) * BOT_SPEED;
-        this.lastAngle = Math.atan2(dy, dx) + Math.PI / 2;
+        this.lastAngle = Math.atan2(dy, dx) - Math.PI / 2;
       }
       if (this.moveTimer <= 0) {
         this.pauseTimer = randomInRange(40, 120);
@@ -170,7 +170,7 @@ export class GameEngine {
       radius: PLAYER_RADIUS,
       targetX: CANVAS_W / 2,
       targetY: CANVAS_H - 80,
-      lastAngle: 0,
+      lastAngle: Math.PI,
     };
 
     this.hook = {
@@ -230,6 +230,8 @@ export class GameEngine {
     this.hook.vx = (dx / d) * HOOK_SPEED;
     this.hook.vy = (dy / d) * HOOK_SPEED;
     this.hook.grabbedBot = null;
+    // Face toward hook direction
+    this.player.lastAngle = Math.atan2(dy, dx) - Math.PI / 2;
   }
 
   onRestart() {
@@ -255,7 +257,7 @@ export class GameEngine {
     if (d > 2) {
       p.x += (dx / d) * PLAYER_SPEED;
       p.y += (dy / d) * PLAYER_SPEED;
-      p.lastAngle = Math.atan2(dy, dx) + Math.PI / 2;
+      p.lastAngle = Math.atan2(dy, dx) - Math.PI / 2;
     }
     // Enforce bounds (below river)
     const minY = RIVER_Y + RIVER_H + p.radius;
@@ -371,6 +373,8 @@ export class GameEngine {
           h.vx = (dx / d) * BOT_HOOK_SPEED;
           h.vy = (dy / d) * BOT_HOOK_SPEED;
           h.grabbedPlayer = false;
+          // Face toward player when hooking
+          bot.lastAngle = Math.atan2(dy, dx) - Math.PI / 2;
         }
         bot.hookCooldown = randomInRange(BOT_HOOK_COOLDOWN_MIN, BOT_HOOK_COOLDOWN_MAX);
       }
