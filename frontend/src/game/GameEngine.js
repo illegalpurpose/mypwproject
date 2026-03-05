@@ -532,15 +532,10 @@ export class GameEngine {
     ctx.stroke();
   }
 
-  drawSprite(ctx, img, x, y, size, facingLeft, rotate180) {
+  drawSprite(ctx, img, x, y, size, angle) {
     ctx.save();
     ctx.translate(x, y);
-    if (rotate180) {
-      ctx.rotate(Math.PI);
-    }
-    if (facingLeft) {
-      ctx.scale(-1, 1);
-    }
+    ctx.rotate(angle);
     ctx.drawImage(img, -size / 2, -size / 2, size, size);
     ctx.restore();
   }
@@ -555,9 +550,11 @@ export class GameEngine {
     ctx.fill();
 
     if (this.spriteLoaded) {
-      // Face toward mouse, rotate 180 degrees
-      const facingLeft = this.mouseX < p.x;
-      this.drawSprite(ctx, this.sprite, p.x, p.y, SPRITE_SIZE_PLAYER, facingLeft, true);
+      // Angle toward movement target
+      const dx = p.targetX - p.x;
+      const dy = p.targetY - p.y;
+      const angle = Math.atan2(dy, dx) + Math.PI / 2;
+      this.drawSprite(ctx, this.sprite, p.x, p.y, SPRITE_SIZE_PLAYER, angle);
     } else {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
@@ -577,9 +574,10 @@ export class GameEngine {
       ctx.fill();
 
       if (this.spriteLoaded && this.botSprite) {
-        // Face toward their movement target
-        const facingLeft = bot.targetX < bot.x;
-        this.drawSprite(ctx, this.botSprite, bot.x, bot.y, SPRITE_SIZE_BOT, facingLeft, false);
+        const dx = bot.targetX - bot.x;
+        const dy = bot.targetY - bot.y;
+        const angle = Math.atan2(dy, dx) + Math.PI / 2;
+        this.drawSprite(ctx, this.botSprite, bot.x, bot.y, SPRITE_SIZE_BOT, angle);
       } else {
         // Fallback circle
         ctx.beginPath();
