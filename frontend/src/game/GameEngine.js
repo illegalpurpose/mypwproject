@@ -452,6 +452,9 @@ export class GameEngine {
         h.grabbedPlayer = true;
         h.state = HOOK_DRAGGING;
         this.playerBeingDragged = true;
+        // Reset player's own hook
+        this.hook.state = HOOK_IDLE;
+        this.hook.grabbedBot = null;
       }
     }
 
