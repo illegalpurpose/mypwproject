@@ -56,6 +56,9 @@ export const PudgeWarsGame = () => {
       if (e.key === "q" || e.key === "Q" || e.key === "й" || e.key === "Й") {
         engine.onHook();
       }
+      if (e.key === "w" || e.key === "W" || e.key === "ц" || e.key === "Ц") {
+        engine.onBlink();
+      }
       if (e.key === "r" || e.key === "R" || e.key === "к" || e.key === "К") {
         if (engine.isVictory()) {
           engine.onRestart();

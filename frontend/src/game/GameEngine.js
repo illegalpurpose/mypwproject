@@ -194,6 +194,8 @@ export class GameEngine {
     this.mouseX = CANVAS_W / 2;
     this.mouseY = 0;
     this.playerBeingDragged = false;
+    this.blinkCooldown = 0;
+    this.blinkEffect = null;
   }
 
   // --- Input handlers ---
@@ -216,6 +218,7 @@ export class GameEngine {
     if (this.victory) return;
     if (this.hook.state !== HOOK_IDLE) return;
     if (this.playerBeingDragged) return;
+    if (this.blinkCooldown > 0) return;
 
     const dx = this.mouseX - this.player.x;
     const dy = this.mouseY - this.player.y;
@@ -238,9 +241,56 @@ export class GameEngine {
     this.reset();
   }
 
+  onBlink() {
+    if (this.victory) return;
+    if (this.hook.state !== HOOK_IDLE) return;
+    if (this.playerBeingDragged) return;
+    if (this.blinkCooldown > 0) return;
+
+    const p = this.player;
+    const maxDist = HOOK_MAX_DIST / 2;
+    const dx = this.mouseX - p.x;
+    const dy = this.mouseY - p.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 5) return;
+
+    // Calculate blink destination (capped at maxDist)
+    const blinkDist = Math.min(d, maxDist);
+    let newX = p.x + (dx / d) * blinkDist;
+    let newY = p.y + (dy / d) * blinkDist;
+
+    // Clamp to player area (below river, within canvas)
+    const minY = RIVER_Y + RIVER_H + p.radius;
+    newX = clamp(newX, p.radius, CANVAS_W - p.radius);
+    newY = clamp(newY, minY, CANVAS_H - p.radius);
+
+    // Save old position for effect
+    const oldX = p.x;
+    const oldY = p.y;
+
+    // Teleport
+    p.x = newX;
+    p.y = newY;
+    p.targetX = newX;
+    p.targetY = newY;
+    p.lastAngle = Math.atan2(dy, dx) - Math.PI / 2;
+
+    // Cooldown (frames) — blocks hook usage
+    this.blinkCooldown = 30;
+
+    // Visual effect
+    this.blinkEffect = { fromX: oldX, fromY: oldY, toX: newX, toY: newY, timer: 20 };
+  }
+
   // --- Update ---
   update() {
     if (this.victory) return;
+
+    if (this.blinkCooldown > 0) this.blinkCooldown--;
+    if (this.blinkEffect) {
+      this.blinkEffect.timer--;
+      if (this.blinkEffect.timer <= 0) this.blinkEffect = null;
+    }
 
     this.updatePlayer();
     this.updateHook();
@@ -449,6 +499,7 @@ export class GameEngine {
     this.drawBots(ctx);
     this.drawHook(ctx);
     this.drawPlayer(ctx);
+    this.drawBlinkEffect(ctx);
     this.drawHUD(ctx);
 
     if (this.victory) {
@@ -624,6 +675,33 @@ export class GameEngine {
     // Hook head sprite
     this.drawHookSprite(ctx, h.x, h.y, this.player.x, this.player.y);
   }
+
+  drawBlinkEffect(ctx) {
+    if (!this.blinkEffect) return;
+    const e = this.blinkEffect;
+    const alpha = e.timer / 20;
+
+    // Ghost at old position
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.beginPath();
+    ctx.arc(e.fromX, e.fromY, PLAYER_RADIUS + 5, 0, Math.PI * 2);
+    ctx.fillStyle = COL_PLAYER;
+    ctx.fill();
+
+    // Trail line
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(e.fromX, e.fromY);
+    ctx.lineTo(e.toX, e.toY);
+    ctx.strokeStyle = COL_PLAYER;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.globalAlpha = 1;
+  }
+
 
   drawHUD(ctx) {
     // Score in top-left
