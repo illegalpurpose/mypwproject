@@ -15,9 +15,15 @@ const PUDGE_SPRITE_URL = "/pudge_sprite.png";
 const HOOK_RADIUS = 8;
 const HOOK_SPEED = 12;
 const HOOK_RETURN_SPEED = 14;
-const HOOK_MAX_DIST = 300;
+const HOOK_MAX_DIST = 500;
 const PLAYER_SPEED = 3.5;
 const BOT_SPEED = 1.2;
+const BOT_HOOK_SPEED = 10;
+const BOT_HOOK_RETURN_SPEED = 12;
+const BOT_HOOK_COOLDOWN_MIN = 150;
+const BOT_HOOK_COOLDOWN_MAX = 350;
+const COL_BOT_HOOK = "#FF6644";
+const COL_BOT_HOOK_CHAIN = "rgba(255,100,68,0.6)";
 
 const MAX_SCORE = 15;
 const BOT_COUNT = 3;
@@ -62,6 +68,15 @@ class Bot {
     this.pauseTimer = randomInRange(40, 100);
     this.hooked = false;
     this.alive = true;
+    // Bot hook state
+    this.hook = {
+      x: 0, y: 0,
+      vx: 0, vy: 0,
+      state: HOOK_IDLE,
+      startX: 0, startY: 0,
+      grabbedPlayer: false,
+    };
+    this.hookCooldown = randomInRange(BOT_HOOK_COOLDOWN_MIN, BOT_HOOK_COOLDOWN_MAX);
   }
 
   pickNewTarget() {
@@ -303,6 +318,92 @@ export class GameEngine {
   updateBots() {
     for (const bot of this.bots) {
       bot.update();
+      if (bot.alive && !bot.hooked) {
+        this.updateBotHook(bot);
+      }
+    }
+  }
+
+  updateBotHook(bot) {
+    const h = bot.hook;
+
+    // Cooldown & fire logic
+    if (h.state === HOOK_IDLE) {
+      bot.hookCooldown--;
+      if (bot.hookCooldown <= 0) {
+        // Fire hook toward player
+        const dx = this.player.x - bot.x;
+        const dy = this.player.y - bot.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 1) {
+          h.state = HOOK_FLYING;
+          h.x = bot.x;
+          h.y = bot.y;
+          h.startX = bot.x;
+          h.startY = bot.y;
+          h.vx = (dx / d) * BOT_HOOK_SPEED;
+          h.vy = (dy / d) * BOT_HOOK_SPEED;
+          h.grabbedPlayer = false;
+        }
+        bot.hookCooldown = randomInRange(BOT_HOOK_COOLDOWN_MIN, BOT_HOOK_COOLDOWN_MAX);
+      }
+      return;
+    }
+
+    if (h.state === HOOK_FLYING) {
+      h.x += h.vx;
+      h.y += h.vy;
+
+      // Max distance
+      const d = dist(h, { x: h.startX, y: h.startY });
+      if (d >= HOOK_MAX_DIST) {
+        h.state = HOOK_RETURNING;
+      }
+      // Out of canvas
+      if (h.x < 0 || h.x > CANVAS_W || h.y < 0 || h.y > CANVAS_H) {
+        h.state = HOOK_RETURNING;
+      }
+      // Hit player?
+      if (dist(h, this.player) < HOOK_RADIUS + this.player.radius) {
+        h.grabbedPlayer = true;
+        h.state = HOOK_DRAGGING;
+      }
+    }
+
+    if (h.state === HOOK_RETURNING) {
+      const dx = bot.x - h.x;
+      const dy = bot.y - h.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 10) {
+        h.state = HOOK_IDLE;
+      } else {
+        h.x += (dx / d) * BOT_HOOK_RETURN_SPEED;
+        h.y += (dy / d) * BOT_HOOK_RETURN_SPEED;
+      }
+    }
+
+    if (h.state === HOOK_DRAGGING) {
+      // Drag player toward bot
+      const dx = bot.x - h.x;
+      const dy = bot.y - h.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 15) {
+        // Player reached bot — score reset!
+        this.score = 0;
+        h.grabbedPlayer = false;
+        h.state = HOOK_IDLE;
+        // Push player back to starting position
+        this.player.x = CANVAS_W / 2;
+        this.player.y = CANVAS_H - 80;
+        this.player.targetX = this.player.x;
+        this.player.targetY = this.player.y;
+      } else {
+        h.x += (dx / d) * BOT_HOOK_RETURN_SPEED;
+        h.y += (dy / d) * BOT_HOOK_RETURN_SPEED;
+        // Drag player along
+        this.player.x = h.x;
+        this.player.y = h.y;
+      }
     }
   }
 
@@ -311,6 +412,7 @@ export class GameEngine {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     this.drawGround(ctx);
     this.drawRiver(ctx);
+    this.drawBotHooks(ctx);
     this.drawBots(ctx);
     this.drawHook(ctx);
     this.drawPlayer(ctx);
@@ -318,6 +420,36 @@ export class GameEngine {
 
     if (this.victory) {
       this.drawVictory(ctx);
+    }
+  }
+
+  drawBotHooks(ctx) {
+    for (const bot of this.bots) {
+      if (!bot.alive) continue;
+      const h = bot.hook;
+      if (h.state === HOOK_IDLE) continue;
+
+      // Chain line from bot to hook
+      ctx.beginPath();
+      ctx.moveTo(bot.x, bot.y);
+      ctx.lineTo(h.x, h.y);
+      ctx.strokeStyle = COL_BOT_HOOK_CHAIN;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Hook head
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, HOOK_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = COL_BOT_HOOK;
+      ctx.fill();
+
+      // Glow
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, HOOK_RADIUS + 4, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,100,68,0.2)";
+      ctx.fill();
     }
   }
 
@@ -378,9 +510,12 @@ export class GameEngine {
     ctx.stroke();
   }
 
-  drawSprite(ctx, img, x, y, size, facingLeft) {
+  drawSprite(ctx, img, x, y, size, facingLeft, rotate180) {
     ctx.save();
     ctx.translate(x, y);
+    if (rotate180) {
+      ctx.rotate(Math.PI);
+    }
     if (facingLeft) {
       ctx.scale(-1, 1);
     }
@@ -398,11 +533,10 @@ export class GameEngine {
     ctx.fill();
 
     if (this.spriteLoaded) {
-      // Face toward mouse
+      // Face toward mouse, rotate 180 degrees
       const facingLeft = this.mouseX < p.x;
-      this.drawSprite(ctx, this.sprite, p.x, p.y, SPRITE_SIZE_PLAYER, facingLeft);
+      this.drawSprite(ctx, this.sprite, p.x, p.y, SPRITE_SIZE_PLAYER, facingLeft, true);
     } else {
-      // Fallback circle while loading
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.fillStyle = COL_PLAYER;
@@ -423,7 +557,7 @@ export class GameEngine {
       if (this.spriteLoaded && this.botSprite) {
         // Face toward their movement target
         const facingLeft = bot.targetX < bot.x;
-        this.drawSprite(ctx, this.botSprite, bot.x, bot.y, SPRITE_SIZE_BOT, facingLeft);
+        this.drawSprite(ctx, this.botSprite, bot.x, bot.y, SPRITE_SIZE_BOT, facingLeft, false);
       } else {
         // Fallback circle
         ctx.beginPath();
