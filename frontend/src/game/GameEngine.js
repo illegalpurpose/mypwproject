@@ -7,8 +7,11 @@ const CANVAS_H = 700;
 const RIVER_Y = CANVAS_H / 2 - 50;
 const RIVER_H = 100;
 
-const PLAYER_RADIUS = 22;
-const BOT_RADIUS = 20;
+const PLAYER_RADIUS = 28;
+const BOT_RADIUS = 26;
+const SPRITE_SIZE_PLAYER = 64;
+const SPRITE_SIZE_BOT = 56;
+const PUDGE_SPRITE_URL = "/pudge_sprite.png";
 const HOOK_RADIUS = 8;
 const HOOK_SPEED = 12;
 const HOOK_RETURN_SPEED = 14;
@@ -107,6 +110,29 @@ const HOOK_DRAGGING = 3;
 
 export class GameEngine {
   constructor() {
+    // Load sprite
+    this.spriteLoaded = false;
+    this.sprite = new Image();
+    this.sprite.crossOrigin = "anonymous";
+    this.sprite.onload = () => { this.spriteLoaded = true; };
+    this.sprite.src = PUDGE_SPRITE_URL;
+
+    // Create red-tinted sprite for bots (off-screen canvas)
+    this.botSprite = null;
+    this.sprite.onload = () => {
+      this.spriteLoaded = true;
+      // Create red-tinted version using hue-rotate + saturate
+      const offCanvas = document.createElement("canvas");
+      offCanvas.width = this.sprite.width;
+      offCanvas.height = this.sprite.height;
+      const offCtx = offCanvas.getContext("2d");
+      // Apply red shift via filter
+      offCtx.filter = "hue-rotate(-30deg) saturate(2.5) brightness(0.85)";
+      offCtx.drawImage(this.sprite, 0, 0);
+      offCtx.filter = "none";
+      this.botSprite = offCanvas;
+    };
+
     this.reset();
   }
 
@@ -352,38 +378,34 @@ export class GameEngine {
     ctx.stroke();
   }
 
+  drawSprite(ctx, img, x, y, size, facingLeft) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (facingLeft) {
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(img, -size / 2, -size / 2, size, size);
+    ctx.restore();
+  }
+
   drawPlayer(ctx) {
     const p = this.player;
 
-    // Glow
+    // Glow under sprite
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius + 8, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.radius + 10, 0, Math.PI * 2);
     ctx.fillStyle = COL_PLAYER_GLOW;
     ctx.fill();
 
-    // Body
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctx.fillStyle = COL_PLAYER;
-    ctx.fill();
-
-    // Inner ring
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius - 5, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(0,0,0,0.3)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Direction indicator (small dot toward mouse)
-    const dx = this.mouseX - p.x;
-    const dy = this.mouseY - p.y;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    if (d > 1) {
-      const ix = p.x + (dx / d) * (p.radius - 4);
-      const iy = p.y + (dy / d) * (p.radius - 4);
+    if (this.spriteLoaded) {
+      // Face toward mouse
+      const facingLeft = this.mouseX < p.x;
+      this.drawSprite(ctx, this.sprite, p.x, p.y, SPRITE_SIZE_PLAYER, facingLeft);
+    } else {
+      // Fallback circle while loading
       ctx.beginPath();
-      ctx.arc(ix, iy, 4, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff";
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = COL_PLAYER;
       ctx.fill();
     }
   }
@@ -392,24 +414,23 @@ export class GameEngine {
     for (const bot of this.bots) {
       if (!bot.alive) continue;
 
-      // Glow
+      // Red glow under sprite
       ctx.beginPath();
-      ctx.arc(bot.x, bot.y, bot.radius + 6, 0, Math.PI * 2);
+      ctx.arc(bot.x, bot.y, bot.radius + 8, 0, Math.PI * 2);
       ctx.fillStyle = COL_BOT_GLOW;
       ctx.fill();
 
-      // Body
-      ctx.beginPath();
-      ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
-      ctx.fillStyle = COL_BOT;
-      ctx.fill();
-
-      // Inner ring
-      ctx.beginPath();
-      ctx.arc(bot.x, bot.y, bot.radius - 4, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(0,0,0,0.3)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      if (this.spriteLoaded && this.botSprite) {
+        // Face toward their movement target
+        const facingLeft = bot.targetX < bot.x;
+        this.drawSprite(ctx, this.botSprite, bot.x, bot.y, SPRITE_SIZE_BOT, facingLeft);
+      } else {
+        // Fallback circle
+        ctx.beginPath();
+        ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
+        ctx.fillStyle = COL_BOT;
+        ctx.fill();
+      }
     }
   }
 
