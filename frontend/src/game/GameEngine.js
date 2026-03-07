@@ -175,6 +175,7 @@ export class GameEngine {
     this.iconBlink.onload = () => { this.iconBlinkLoaded = true; };
     this.iconBlink.src = "/icon_blink.png";
 
+    this.record = 0;
     this.reset();
   }
 
@@ -535,6 +536,9 @@ export class GameEngine {
         // Player caught by bot — GAME OVER!
         this.defeat = true;
         this.gameOver = true;
+        if (this.score > this.record) {
+          this.record = this.score;
+        }
         h.grabbedPlayer = false;
         h.state = HOOK_IDLE;
         this.playerBeingDragged = false;
@@ -908,6 +912,11 @@ export class GameEngine {
     ctx.fillStyle = COL_PLAYER;
     ctx.textAlign = "left";
     ctx.fillText(`Score: ${this.score}`, 20, 34);
+
+    // Record next to score
+    ctx.font = "bold 18px 'Rajdhani', sans-serif";
+    ctx.fillStyle = "#FFD700";
+    ctx.fillText(`Record: ${this.record}`, 170, 34);
 
     // Ability bar — bottom-left
     const barX = 16;
