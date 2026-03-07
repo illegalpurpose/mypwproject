@@ -130,6 +130,11 @@ const HOOK_DRAGGING = 3;
 
 export class GameEngine {
   constructor() {
+    // Generate pixel grass tile patterns
+    this.grassPatternTop = null;
+    this.grassPatternBot = null;
+    this._generateGrassPatterns();
+
     // Load sprite
     this.spriteLoaded = false;
     this.sprite = new Image();
@@ -569,25 +574,119 @@ export class GameEngine {
     }
   }
 
+  _generateGrassPatterns() {
+    this.grassPatternTop = this._createGrassTile(
+      [45, 90, 30],   // base RGB (dark green)
+      [35, 75, 22],   // dark shade
+      [55, 110, 38],  // mid shade
+      [65, 130, 45],  // light blade
+      [40, 80, 28]    // shadow
+    );
+    this.grassPatternBot = this._createGrassTile(
+      [58, 122, 40],  // base RGB (lighter green)
+      [48, 105, 32],  // dark shade
+      [68, 140, 48],  // mid shade
+      [80, 160, 55],  // light blade
+      [52, 110, 36]   // shadow
+    );
+  }
+
+  _createGrassTile(base, dark, mid, light, shadow) {
+    const SIZE = 32;
+    const c = document.createElement("canvas");
+    c.width = SIZE;
+    c.height = SIZE;
+    const g = c.getContext("2d");
+
+    // Fill base color
+    g.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
+    g.fillRect(0, 0, SIZE, SIZE);
+
+    // Seeded random for consistent pattern
+    const rand = (x, y, seed) => {
+      const n = Math.sin(x * 127.1 + y * 311.7 + seed * 43758.5453) * 43758.5453;
+      return n - Math.floor(n);
+    };
+
+    // Scatter darker earth/shadow pixels
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const r = rand(x, y, 1);
+        if (r < 0.12) {
+          g.fillStyle = `rgb(${dark[0]},${dark[1]},${dark[2]})`;
+          g.fillRect(x, y, 1, 1);
+        } else if (r < 0.22) {
+          g.fillStyle = `rgb(${shadow[0]},${shadow[1]},${shadow[2]})`;
+          g.fillRect(x, y, 1, 1);
+        } else if (r < 0.35) {
+          g.fillStyle = `rgb(${mid[0]},${mid[1]},${mid[2]})`;
+          g.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+
+    // Draw grass blade tufts (small 1-3px tall vertical lines)
+    for (let i = 0; i < 18; i++) {
+      const bx = Math.floor(rand(i, 0, 7) * SIZE);
+      const by = Math.floor(rand(0, i, 13) * SIZE);
+      const h = 1 + Math.floor(rand(i, i, 3) * 3); // blade height 1-3px
+      const shade = rand(i, i, 99) < 0.5 ? light : mid;
+      g.fillStyle = `rgb(${shade[0]},${shade[1]},${shade[2]})`;
+      g.fillRect(bx, by, 1, h);
+    }
+
+    // Draw small grass clumps (2x2 or 2x1 clusters)
+    for (let i = 0; i < 8; i++) {
+      const cx = Math.floor(rand(i, 5, 21) * (SIZE - 2));
+      const cy = Math.floor(rand(5, i, 37) * (SIZE - 2));
+      g.fillStyle = `rgb(${light[0]},${light[1]},${light[2]})`;
+      g.fillRect(cx, cy, 2, 1);
+      g.fillStyle = `rgb(${mid[0]},${mid[1]},${mid[2]})`;
+      g.fillRect(cx, cy + 1, 1, 1);
+    }
+
+    // Add tiny highlight dots
+    for (let i = 0; i < 6; i++) {
+      const hx = Math.floor(rand(i, 9, 53) * SIZE);
+      const hy = Math.floor(rand(9, i, 71) * SIZE);
+      g.fillStyle = `rgba(${light[0] + 30},${light[1] + 30},${light[2] + 20},0.6)`;
+      g.fillRect(hx, hy, 1, 1);
+    }
+
+    return c;
+  }
+
   drawGround(ctx) {
-    // Top grass (bot area)
-    ctx.fillStyle = COL_GRASS_TOP;
-    ctx.fillRect(0, 0, CANVAS_W, RIVER_Y);
+    // Top grass (bot area) — pixel tile pattern
+    if (this.grassPatternTop) {
+      const pat = ctx.createPattern(this.grassPatternTop, "repeat");
+      ctx.fillStyle = pat;
+      ctx.fillRect(0, 0, CANVAS_W, RIVER_Y);
+    } else {
+      ctx.fillStyle = COL_GRASS_TOP;
+      ctx.fillRect(0, 0, CANVAS_W, RIVER_Y);
+    }
 
-    // Bottom grass (player area)
-    ctx.fillStyle = COL_GRASS_BOT;
-    ctx.fillRect(0, RIVER_Y + RIVER_H, CANVAS_W, CANVAS_H - RIVER_Y - RIVER_H);
+    // Bottom grass (player area) — pixel tile pattern
+    if (this.grassPatternBot) {
+      const pat = ctx.createPattern(this.grassPatternBot, "repeat");
+      ctx.fillStyle = pat;
+      ctx.fillRect(0, RIVER_Y + RIVER_H, CANVAS_W, CANVAS_H - RIVER_Y - RIVER_H);
+    } else {
+      ctx.fillStyle = COL_GRASS_BOT;
+      ctx.fillRect(0, RIVER_Y + RIVER_H, CANVAS_W, CANVAS_H - RIVER_Y - RIVER_H);
+    }
 
-    // Grid lines for texture
-    ctx.strokeStyle = "rgba(0,0,0,0.08)";
+    // Subtle grid overlay for Dota-style ground feel
+    ctx.strokeStyle = "rgba(0,0,0,0.04)";
     ctx.lineWidth = 1;
-    for (let x = 0; x < CANVAS_W; x += 40) {
+    for (let x = 0; x < CANVAS_W; x += 32) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, CANVAS_H);
       ctx.stroke();
     }
-    for (let y = 0; y < CANVAS_H; y += 40) {
+    for (let y = 0; y < CANVAS_H; y += 32) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(CANVAS_W, y);
