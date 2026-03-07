@@ -175,6 +175,11 @@ export class GameEngine {
     this.iconBlink.onload = () => { this.iconBlinkLoaded = true; };
     this.iconBlink.src = "/icon_blink.png";
 
+    this.iconInvis = new Image();
+    this.iconInvisLoaded = false;
+    this.iconInvis.onload = () => { this.iconInvisLoaded = true; };
+    this.iconInvis.src = "/icon_invis.png";
+
     this.record = 0;
     this.reset();
   }
@@ -215,6 +220,9 @@ export class GameEngine {
     this.blinkCooldown = 0;
     this.blinkEffect = null;
     this.clickEffects = [];
+    this.invisible = false;
+    this.invisibleTimer = 0;
+    this.invisibleCooldown = 0;
   }
 
   // --- Input handlers ---
@@ -311,6 +319,17 @@ export class GameEngine {
     this.blinkEffect = { fromX: oldX, fromY: oldY, toX: newX, toY: newY, timer: 20 };
   }
 
+  onInvisible() {
+    if (this.gameOver) return;
+    if (this.playerBeingDragged) return;
+    if (this.invisibleCooldown > 0) return;
+    if (this.invisible) return;
+
+    this.invisible = true;
+    this.invisibleTimer = 90; // ~1.5 sec at 60fps
+    this.invisibleCooldown = 600; // ~10 sec cooldown at 60fps
+  }
+
   // --- Update ---
   update(dt) {
     if (this.gameOver) return;
@@ -319,6 +338,16 @@ export class GameEngine {
     if (this.blinkEffect) {
       this.blinkEffect.timer -= dt;
       if (this.blinkEffect.timer <= 0) this.blinkEffect = null;
+    }
+
+    // Invisibility timers
+    if (this.invisibleCooldown > 0) this.invisibleCooldown -= dt;
+    if (this.invisible) {
+      this.invisibleTimer -= dt;
+      if (this.invisibleTimer <= 0) {
+        this.invisible = false;
+        this.invisibleTimer = 0;
+      }
     }
 
     // Safety: fix orphaned hooked bots (hooked but nobody is dragging them)
@@ -500,8 +529,8 @@ export class GameEngine {
       if (h.x < 0 || h.x > CANVAS_W || h.y < 0 || h.y > CANVAS_H) {
         h.state = HOOK_RETURNING;
       }
-      // Hit player?
-      if (dist(h, this.player) < HOOK_RADIUS + this.player.radius) {
+      // Hit player? (not if player is invisible)
+      if (!this.invisible && dist(h, this.player) < HOOK_RADIUS + this.player.radius) {
         h.grabbedPlayer = true;
         h.state = HOOK_DRAGGING;
         this.playerBeingDragged = true;
@@ -805,6 +834,18 @@ export class GameEngine {
   drawPlayer(ctx) {
     const p = this.player;
 
+    // Invisibility visual: flickering ghost
+    if (this.invisible) {
+      const flicker = 0.15 + Math.sin(Date.now() * 0.015) * 0.1;
+      ctx.globalAlpha = flicker;
+
+      // Shimmer glow
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius + 14, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(100,180,255,0.15)";
+      ctx.fill();
+    }
+
     // Glow under sprite
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.radius + 10, 0, Math.PI * 2);
@@ -819,6 +860,8 @@ export class GameEngine {
       ctx.fillStyle = COL_PLAYER;
       ctx.fill();
     }
+
+    ctx.globalAlpha = 1;
   }
 
   drawBots(ctx) {
@@ -931,9 +974,13 @@ export class GameEngine {
     // W — Blink
     const blinkReady = this.blinkCooldown <= 0 && this.hook.state === HOOK_IDLE && !this.playerBeingDragged;
     this.drawAbilityBox(ctx, barX + boxSize + gap, barY, boxSize, "W", blinkReady, "#9B59FF", this.iconBlinkLoaded ? this.iconBlink : null);
+
+    // E — Invisibility
+    const invisReady = this.invisibleCooldown <= 0 && !this.invisible && !this.playerBeingDragged;
+    this.drawAbilityBox(ctx, barX + (boxSize + gap) * 2, barY, boxSize, "E", invisReady, "#4A9EFF", this.iconInvisLoaded ? this.iconInvis : null, this.invisible ? this.invisibleTimer / 90 : null, this.invisibleCooldown > 0 ? this.invisibleCooldown / 600 : null);
   }
 
-  drawAbilityBox(ctx, x, y, size, key, ready, color, icon) {
+  drawAbilityBox(ctx, x, y, size, key, ready, color, icon, activeRatio, cooldownRatio) {
     // Background
     ctx.fillStyle = ready ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.5)";
     ctx.strokeStyle = ready ? color : "rgba(255,255,255,0.1)";
@@ -943,18 +990,44 @@ export class GameEngine {
     ctx.fill();
     ctx.stroke();
 
-    // Cooldown overlay
-    if (!ready) {
+    // Cooldown sweep overlay (clock-like wipe)
+    if (cooldownRatio && cooldownRatio > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x, y, size, size, 6);
+      ctx.clip();
+      // Fill from bottom up based on remaining cooldown
+      const fillH = size * cooldownRatio;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(x, y, size, size - (size - fillH));
+      ctx.restore();
+    } else if (!ready && !activeRatio) {
       ctx.fillStyle = "rgba(0,0,0,0.4)";
       ctx.beginPath();
       ctx.roundRect(x, y, size, size, 6);
       ctx.fill();
     }
 
+    // Active glow border when ability is active
+    if (activeRatio && activeRatio > 0) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.roundRect(x, y, size, size, 6);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Active timer bar at bottom
+      ctx.fillStyle = color;
+      ctx.fillRect(x + 2, y + size - 5, (size - 4) * activeRatio, 3);
+    }
+
     // Icon
     if (icon) {
       ctx.save();
-      ctx.globalAlpha = ready ? 1 : 0.35;
+      ctx.globalAlpha = ready || activeRatio ? 1 : 0.35;
       const pad = 6;
       const iconSize = size - pad * 2;
       ctx.drawImage(icon, x + pad, y + pad, iconSize, iconSize);
@@ -963,7 +1036,7 @@ export class GameEngine {
 
     // Key letter — small badge top-left
     ctx.font = "bold 12px 'Rajdhani', sans-serif";
-    ctx.fillStyle = ready ? color : "#555";
+    ctx.fillStyle = ready || activeRatio ? color : "#555";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(key, x + 4, y + 2);

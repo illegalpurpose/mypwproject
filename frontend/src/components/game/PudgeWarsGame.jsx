@@ -82,6 +82,14 @@ export const PudgeWarsGame = () => {
                 engine.onBlink();
             }
             if (
+                e.key === "e" ||
+                e.key === "E" ||
+                e.key === "у" ||
+                e.key === "У"
+            ) {
+                engine.onInvisible();
+            }
+            if (
                 e.key === "r" ||
                 e.key === "R" ||
                 e.key === "к" ||
