@@ -180,6 +180,12 @@ export class GameEngine {
     this.iconInvis.onload = () => { this.iconInvisLoaded = true; };
     this.iconInvis.src = "/icon_invis.png";
 
+    // Load chain link sprite
+    this.chainSprite = new Image();
+    this.chainSpriteLoaded = false;
+    this.chainSprite.onload = () => { this.chainSpriteLoaded = true; };
+    this.chainSprite.src = "/chain_link.png";
+
     this.record = 0;
     this.reset();
   }
@@ -645,21 +651,56 @@ export class GameEngine {
     }
   }
 
+  drawChain(ctx, fromX, fromY, toX, toY, tint) {
+    if (!this.chainSpriteLoaded) {
+      // Fallback: dashed line
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.strokeStyle = tint || COL_HOOK_CHAIN;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      return;
+    }
+
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const chainLen = Math.sqrt(dx * dx + dy * dy);
+    if (chainLen < 2) return;
+
+    const angle = Math.atan2(dy, dx) + Math.PI / 2;
+    const linkSize = 18; // size of each chain link on screen
+    const step = linkSize * 0.75; // overlap links slightly
+    const count = Math.floor(chainLen / step);
+
+    ctx.save();
+    if (tint) {
+      ctx.globalAlpha = 0.85;
+    }
+    for (let i = 0; i <= count; i++) {
+      const t = (i * step) / chainLen;
+      if (t > 1) break;
+      const cx = fromX + dx * t;
+      const cy = fromY + dy * t;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.drawImage(this.chainSprite, -linkSize / 2, -linkSize / 2, linkSize, linkSize);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   drawBotHooks(ctx) {
     for (const bot of this.bots) {
       if (!bot.alive) continue;
       const h = bot.hook;
       if (h.state === HOOK_IDLE) continue;
 
-      // Chain line from bot to hook
-      ctx.beginPath();
-      ctx.moveTo(bot.x, bot.y);
-      ctx.lineTo(h.x, h.y);
-      ctx.strokeStyle = COL_BOT_HOOK_CHAIN;
-      ctx.lineWidth = 3;
-      ctx.setLineDash([8, 6]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // Chain from bot to hook (sprite-based)
+      this.drawChain(ctx, bot.x, bot.y, h.x, h.y, COL_BOT_HOOK_CHAIN);
 
       // Hook head sprite
       this.drawHookSprite(ctx, h.x, h.y, bot.x, bot.y);
@@ -908,15 +949,8 @@ export class GameEngine {
     const h = this.hook;
     if (h.state === HOOK_IDLE) return;
 
-    // Chain line from player to hook
-    ctx.beginPath();
-    ctx.moveTo(this.player.x, this.player.y);
-    ctx.lineTo(h.x, h.y);
-    ctx.strokeStyle = COL_HOOK_CHAIN;
-    ctx.lineWidth = 3;
-    ctx.setLineDash([8, 6]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    // Chain from player to hook (sprite-based)
+    this.drawChain(ctx, this.player.x, this.player.y, h.x, h.y);
 
     // Hook head sprite
     this.drawHookSprite(ctx, h.x, h.y, this.player.x, this.player.y);
