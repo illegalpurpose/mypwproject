@@ -75,7 +75,7 @@ export const PudgeWarsGame = () => {
                 e.key === "к" ||
                 e.key === "К"
             ) {
-                if (engine.isVictory()) {
+                if (engine.isGameOver()) {
                     engine.onRestart();
                 }
             }

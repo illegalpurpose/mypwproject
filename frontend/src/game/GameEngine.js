@@ -27,7 +27,6 @@ const BOT_HOOK_COOLDOWN_MAX = 350;
 const COL_BOT_HOOK = "#FF6644";
 const COL_BOT_HOOK_CHAIN = "rgba(255,100,68,0.6)";
 
-const MAX_SCORE = 15;
 const BOT_COUNT = 4;
 
 // Colors
@@ -202,6 +201,8 @@ export class GameEngine {
 
     this.score = 0;
     this.victory = false;
+    this.defeat = false;
+    this.gameOver = false;
     this.mouseX = CANVAS_W / 2;
     this.mouseY = 0;
     this.playerBeingDragged = false;
@@ -216,7 +217,7 @@ export class GameEngine {
   }
 
   onRightClick(canvasX, canvasY) {
-    if (this.victory) return;
+    if (this.gameOver) return;
     if (this.hook.state !== HOOK_IDLE) return;
     if (this.playerBeingDragged) return;
     // Set player move target (bottom half only, can't cross river)
@@ -226,7 +227,7 @@ export class GameEngine {
   }
 
   onHook() {
-    if (this.victory) return;
+    if (this.gameOver) return;
     if (this.hook.state !== HOOK_IDLE) return;
     if (this.playerBeingDragged) return;
     if (this.blinkCooldown > 0) return;
@@ -253,7 +254,7 @@ export class GameEngine {
   }
 
   onBlink() {
-    if (this.victory) return;
+    if (this.gameOver) return;
     if (this.hook.state !== HOOK_IDLE) return;
     if (this.playerBeingDragged) return;
     if (this.blinkCooldown > 0) return;
@@ -295,7 +296,7 @@ export class GameEngine {
 
   // --- Update ---
   update() {
-    if (this.victory) return;
+    if (this.gameOver) return;
 
     if (this.blinkCooldown > 0) this.blinkCooldown--;
     if (this.blinkEffect) {
@@ -402,13 +403,9 @@ export class GameEngine {
         h.grabbedBot = null;
         h.state = HOOK_IDLE;
         this.score++;
-        if (this.score >= MAX_SCORE) {
-          this.victory = true;
-        } else {
-          // Respawn bot
-          bot.respawn();
-          bot.alive = true;
-        }
+        // Respawn bot — game continues infinitely
+        bot.respawn();
+        bot.alive = true;
       } else {
         h.x += (dx / d) * HOOK_RETURN_SPEED;
         h.y += (dy / d) * HOOK_RETURN_SPEED;
@@ -509,16 +506,12 @@ export class GameEngine {
       const dy = bot.y - h.y;
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d < 15) {
-        // Player reached bot — score reset!
-        this.score = 0;
+        // Player caught by bot — GAME OVER!
+        this.defeat = true;
+        this.gameOver = true;
         h.grabbedPlayer = false;
         h.state = HOOK_IDLE;
         this.playerBeingDragged = false;
-        // Push player back to starting position
-        this.player.x = CANVAS_W / 2;
-        this.player.y = CANVAS_H - 80;
-        this.player.targetX = this.player.x;
-        this.player.targetY = this.player.y;
       } else {
         h.x += (dx / d) * BOT_HOOK_RETURN_SPEED;
         h.y += (dy / d) * BOT_HOOK_RETURN_SPEED;
@@ -543,6 +536,9 @@ export class GameEngine {
 
     if (this.victory) {
       this.drawVictory(ctx);
+    }
+    if (this.defeat) {
+      this.drawDefeat(ctx);
     }
   }
 
@@ -747,7 +743,7 @@ export class GameEngine {
     ctx.font = "bold 22px 'Rajdhani', sans-serif";
     ctx.fillStyle = COL_PLAYER;
     ctx.textAlign = "left";
-    ctx.fillText(`Score: ${this.score} / ${MAX_SCORE}`, 20, 34);
+    ctx.fillText(`Score: ${this.score}`, 20, 34);
 
     // Ability bar — bottom-left
     const barX = 16;
@@ -821,9 +817,38 @@ export class GameEngine {
     ctx.fillText("Press R to Restart", CANVAS_W / 2, CANVAS_H / 2 + 30);
   }
 
+  drawDefeat(ctx) {
+    // Dark overlay
+    ctx.fillStyle = "rgba(0,0,0,0.8)";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Game Over text
+    ctx.font = "bold 60px 'Rajdhani', sans-serif";
+    ctx.fillStyle = COL_BOT;
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(255,0,51,0.6)";
+    ctx.shadowBlur = 30;
+    ctx.fillText("GAME OVER", CANVAS_W / 2, CANVAS_H / 2 - 50);
+    ctx.shadowBlur = 0;
+
+    // Score display
+    ctx.font = "bold 36px 'Rajdhani', sans-serif";
+    ctx.fillStyle = COL_PLAYER;
+    ctx.shadowColor = "rgba(0,255,204,0.4)";
+    ctx.shadowBlur = 15;
+    ctx.fillText(`Hooks landed: ${this.score}`, CANVAS_W / 2, CANVAS_H / 2 + 10);
+    ctx.shadowBlur = 0;
+
+    // Restart prompt
+    ctx.font = "500 24px 'Rajdhani', sans-serif";
+    ctx.fillStyle = "#888";
+    ctx.fillText("Press R to Restart", CANVAS_W / 2, CANVAS_H / 2 + 60);
+  }
+
   getCanvasWidth() { return CANVAS_W; }
   getCanvasHeight() { return CANVAS_H; }
   getScore() { return this.score; }
-  getMaxScore() { return MAX_SCORE; }
   isVictory() { return this.victory; }
+  isDefeat() { return this.defeat; }
+  isGameOver() { return this.gameOver; }
 }

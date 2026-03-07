@@ -14,10 +14,11 @@
 ## Core Requirements
 - Canvas-based 2D game with green grass + blue river map
 - Player (cyan) moves via right-click, fires hook via Q key
-- 3 red bots wander randomly above river
-- Hook max range 300px, captures bots on hit, drags to player
-- Score +1 per capture, 15 to win
-- Victory screen with R to restart
+- 4 red bots wander randomly above river, fire hooks at player
+- Hook max range 500px, captures bots on hit, drags to player
+- Score +1 per capture, infinite play
+- Game ends when bot catches player — shows "GAME OVER" with total hooks landed
+- Press R to restart after game over
 
 ## What's Been Implemented (Feb 2026)
 - Full game engine (GameEngine.js) with player, bots, hook, river, scoring
