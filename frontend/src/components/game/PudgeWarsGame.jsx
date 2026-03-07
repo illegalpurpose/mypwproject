@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { GameEngine } from "@/game/GameEngine";
 
 const TARGET_FRAME_MS = 1000 / 60; // 60fps target
@@ -8,6 +8,8 @@ export const PudgeWarsGame = () => {
     const engineRef = useRef(null);
     const rafRef = useRef(null);
     const lastTimeRef = useRef(null);
+    const wrapperRef = useRef(null);
+    const [scale, setScale] = useState(1);
 
     const gameLoop = useCallback((currentTime) => {
         const engine = engineRef.current;
@@ -118,9 +120,35 @@ export const PudgeWarsGame = () => {
         };
     }, [gameLoop]);
 
+    // Dynamic scale to fit viewport
+    useEffect(() => {
+        const calcScale = () => {
+            const wrapper = wrapperRef.current;
+            if (!wrapper) return;
+            // Get natural size of wrapper content
+            const naturalW = wrapper.scrollWidth / (scale || 1);
+            const naturalH = wrapper.scrollHeight / (scale || 1);
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const s = Math.min(vw / naturalW, vh / naturalH, 1); // never scale up, only down
+            setScale(s);
+        };
+        calcScale();
+        window.addEventListener("resize", calcScale);
+        return () => window.removeEventListener("resize", calcScale);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     return (
         <div className="game-page" data-testid="game-page">
-            <div className="game-wrapper" data-testid="game-wrapper">
+            <div
+                ref={wrapperRef}
+                className="game-wrapper"
+                data-testid="game-wrapper"
+                style={{
+                    transform: `scale(${scale})`,
+                    transformOrigin: "center center",
+                }}
+            >
                 <div
                     id="yandex_rtb_R-A-18862906-2"
                     style={{
@@ -136,7 +164,6 @@ export const PudgeWarsGame = () => {
                     ref={canvasRef}
                     className="game-canvas"
                     data-testid="game-canvas"
-                    style={{ maxWidth: "100vw", maxHeight: "100vh" }}
                 />
                 <div
                     id="yandex_rtb_R-A-18862906-3"
