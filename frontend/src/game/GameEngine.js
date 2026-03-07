@@ -13,8 +13,8 @@ const SPRITE_SIZE_PLAYER = 64;
 const SPRITE_SIZE_BOT = 56;
 const PUDGE_SPRITE_URL = "/pudge_sprite.png";
 const HOOK_SPRITE_URL = "/hook_sprite.png";
-const HOOK_SPRITE_SIZE = 36;
-const HOOK_RADIUS = 8;
+const HOOK_SPRITE_SIZE = 52;
+const HOOK_RADIUS = 12;
 const HOOK_SPEED = 12;
 const HOOK_RETURN_SPEED = 14;
 const HOOK_MAX_DIST = 500;
@@ -1017,8 +1017,8 @@ export class GameEngine {
 
     // Ability bar — bottom-left
     const barX = 16;
-    const barY = CANVAS_H - 70;
-    const boxSize = 50;
+    const barY = CANVAS_H - 86;
+    const boxSize = 68;
     const gap = 10;
 
     // Q — Hook
@@ -1082,14 +1082,14 @@ export class GameEngine {
     if (icon) {
       ctx.save();
       ctx.globalAlpha = ready || activeRatio ? 1 : 0.35;
-      const pad = 6;
+      const pad = 4;
       const iconSize = size - pad * 2;
       ctx.drawImage(icon, x + pad, y + pad, iconSize, iconSize);
       ctx.restore();
     }
 
     // Key letter — small badge top-left
-    ctx.font = "bold 12px 'Rajdhani', sans-serif";
+    ctx.font = "bold 16px 'Rajdhani', sans-serif";
     ctx.fillStyle = ready || activeRatio ? color : "#555";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
