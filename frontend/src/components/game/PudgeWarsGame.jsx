@@ -120,62 +120,64 @@ export const PudgeWarsGame = () => {
         };
     }, [gameLoop]);
 
-    // Dynamic scale to fit viewport
-    useEffect(() => {
-        const calcScale = () => {
-            const wrapper = wrapperRef.current;
-            if (!wrapper) return;
-            // Get natural size of wrapper content
-            const naturalW = wrapper.scrollWidth / (scale || 1);
-            const naturalH = wrapper.scrollHeight / (scale || 1);
-            const vw = window.innerWidth;
-            const vh = window.innerHeight;
-            const s = Math.min(vw / naturalW, vh / naturalH, 1); // never scale up, only down
-            setScale(s);
-        };
-        calcScale();
-        window.addEventListener("resize", calcScale);
-        return () => window.removeEventListener("resize", calcScale);
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
     return (
         <div className="game-page" data-testid="game-page">
             <div
                 ref={wrapperRef}
                 className="game-wrapper"
                 data-testid="game-wrapper"
-                style={{
-                    transform: `scale(${scale})`,
-                    transformOrigin: "center center",
-                }}
             >
-                <div
-                    id="yandex_rtb_R-A-18862906-2"
-                    style={{
-                        position: "relative",
-                        backgroundColor: "black",
-                        width: "100%",
-                        minWidth: "160px",
-                        maxWidth: "300px",
-                        height: "100vh",
-                    }}
-                ></div>
+                <div className="banner">
+                    <a
+                        href="/#/go/partner"
+                        rel="sponsored nofollow"
+                        target="_blank"
+                    >
+                        <img src="/PUDGEWARS_1.jpeg" />
+                    </a>
+                    <a
+                        href="/#/go/partner"
+                        rel="sponsored nofollow"
+                        target="_blank"
+                    >
+                        <img src="/PUDGEWARS_2.jpeg" />
+                    </a>
+                    <a
+                        href="/#/go/partner"
+                        rel="sponsored nofollow"
+                        target="_blank"
+                    >
+                        <img src="/PUDGEWARS_3.jpeg" />
+                    </a>
+                </div>
                 <canvas
                     ref={canvasRef}
                     className="game-canvas"
                     data-testid="game-canvas"
                 />
-                <div
-                    id="yandex_rtb_R-A-18862906-3"
-                    style={{
-                        position: "relative",
-                        backgroundColor: "black",
-                        width: "100%",
-                        minWidth: "160px",
-                        maxWidth: "300px",
-                        height: "100vh",
-                    }}
-                ></div>
+                <div className="banner">
+                    <a
+                        href="/#/go/partner"
+                        rel="sponsored nofollow"
+                        target="_blank"
+                    >
+                        <img src="/PUDGEWARS_2.jpeg" />
+                    </a>
+                    <a
+                        href="/#/go/partner"
+                        rel="sponsored nofollow"
+                        target="_blank"
+                    >
+                        <img src="/PUDGEWARS_1.jpeg" />
+                    </a>
+                    <a
+                        href="/#/go/partner"
+                        rel="sponsored nofollow"
+                        target="_blank"
+                    >
+                        <img src="/PUDGEWARS_3.jpeg" />
+                    </a>
+                </div>
             </div>
         </div>
     );
